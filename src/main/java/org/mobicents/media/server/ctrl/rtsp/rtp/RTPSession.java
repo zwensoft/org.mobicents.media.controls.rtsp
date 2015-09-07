@@ -125,7 +125,4 @@ public class RTPSession {
 	public void setRtcpPort(int rtcpPort) {
 		this.rtcpPort = rtcpPort;
 	}
-
-	
-	
 }

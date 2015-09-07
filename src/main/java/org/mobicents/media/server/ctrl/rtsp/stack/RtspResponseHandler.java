@@ -50,6 +50,7 @@ public class RtspResponseHandler extends ChannelInboundHandlerAdapter {
 		super.channelActive(ctx);
 		this.ctx = ctx;
 
+		sendOptions();
 		setState(RTSP.OPTIONS);
 	}
 
@@ -193,8 +194,8 @@ public class RtspResponseHandler extends ChannelInboundHandlerAdapter {
 	public void sendOptions()  {
 		DefaultFullHttpRequest req = new DefaultFullHttpRequest(RtspVersions.RTSP_1_0, RtspMethods.OPTIONS, rtspStack.getUrl());
 		addCSeq(req);
-		
-		rtspStack.sendRquest(req, rtspStack.getRemoteHost(), rtspStack.getRemotePort());
+
+		rtspStack.sendRquest(req, rtspStack.getHost(), rtspStack.getPort());
 	}
 	
 	public void sendDescribe()  {
@@ -202,7 +203,7 @@ public class RtspResponseHandler extends ChannelInboundHandlerAdapter {
 		addCSeq(req);
 		req.headers().add("Accept", "application/sdp");
 
-		rtspStack.sendRquest(req, rtspStack.getRemoteHost(), rtspStack.getRemotePort());
+		rtspStack.sendRquest(req, rtspStack.getHost(), rtspStack.getPort());
 	}
 
 	public void sendUDPSetup(String track, int rtp, int rtcp)  {
@@ -217,7 +218,7 @@ public class RtspResponseHandler extends ChannelInboundHandlerAdapter {
 		addCSeq(req);
 		req.headers().add("Transport", "RTP/AVP;unicast;client_port="+rtp + "-" + rtcp);
 
-		rtspStack.sendRquest(req, rtspStack.getRemoteHost(), rtspStack.getRemotePort());
+		rtspStack.sendRquest(req, rtspStack.getHost(), rtspStack.getPort());
 	}
 	
 	/**
@@ -239,7 +240,7 @@ public class RtspResponseHandler extends ChannelInboundHandlerAdapter {
 		addCSeq(req);
 		req.headers().add("Transport", "RTP/AVP/TCP;interleaved="+rtp + "-" + rtcp);
 
-		rtspStack.sendRquest(req, rtspStack.getRemoteHost(), rtspStack.getRemotePort());
+		rtspStack.sendRquest(req, rtspStack.getHost(), rtspStack.getPort());
 	}
 
 	public void sendPlay()  {
@@ -248,7 +249,7 @@ public class RtspResponseHandler extends ChannelInboundHandlerAdapter {
 		req.headers().add("Session", rtspStack.getSession());
 		req.headers().add("Range", "npt=0.000");
 
-		rtspStack.sendRquest(req, rtspStack.getRemoteHost(), rtspStack.getRemotePort());
+		rtspStack.sendRquest(req, rtspStack.getHost(), rtspStack.getPort());
 	}
 
 	public void sendTeardown()  {
@@ -260,7 +261,7 @@ public class RtspResponseHandler extends ChannelInboundHandlerAdapter {
 			req.headers().add("Session", session);
 		}
 
-		rtspStack.sendRquest(req, rtspStack.getRemoteHost(), rtspStack.getRemotePort());
+		rtspStack.sendRquest(req, rtspStack.getHost(), rtspStack.getPort());
 	}
 	
 	private void addCSeq(DefaultFullHttpRequest req) {

@@ -62,7 +62,7 @@ public class RtspServerStackImpl implements RtspStack {
 		inetAddress = InetAddress.getByName(this.address);
 	}
 
-	public String getAddress() {
+	public String getHost() {
 		return this.address;
 	}
 

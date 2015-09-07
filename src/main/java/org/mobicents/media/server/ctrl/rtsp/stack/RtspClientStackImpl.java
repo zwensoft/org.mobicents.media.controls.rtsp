@@ -58,8 +58,8 @@ public class RtspClientStackImpl implements RtspStack {
 	private static Logger logger = Logger.getLogger(RtspClientStackImpl.class);
 
 	private final PortManager portManager;
-	private final String remoteHost;
-	private final int remotePort;
+	private final String host;
+	private final int port;
 	private final String uri;
 	private final InetAddress inetAddress;
 	private final  String url;
@@ -74,24 +74,17 @@ public class RtspClientStackImpl implements RtspStack {
 
 	public RtspClientStackImpl(PortManager portManager, String address, int port, String uri)
 			throws UnknownHostException {
-		String url = "rtsp://" + getAddress() + ":" + getPort() + uri;
+		String url = "rtsp://" + getHost() + ":" + getPort() + uri;
 		
 		this.portManager = portManager;
-		this.remoteHost = address;
-		this.remotePort = port;
+		this.host = address;
+		this.port = port;
 		this.uri = uri;
 		this.url = url;
-		this.inetAddress = InetAddress.getByName(this.remoteHost);
-
+		this.inetAddress = InetAddress.getByName(this.host);
 	}
 
-	public String getAddress() {
-		return this.remoteHost;
-	}
 
-	public int getPort() {
-		return this.remotePort;
-	}
 
 	public void start() throws IOException {
 
@@ -102,7 +95,7 @@ public class RtspClientStackImpl implements RtspStack {
 		b.handler(new ChannelInitializer<SocketChannel>() {
 			@Override
 			public void initChannel(SocketChannel ch) throws Exception {
-				String url = "rtsp://" + getAddress() + ":" + getPort() + uri;
+				String url = "rtsp://" + getHost() + ":" + getPort() + uri;
 				
 				// 客户端接收到的是httpResponse响应，所以要使用HttpResponseDecoder进行解码
 				ch.pipeline().addLast(new RtspResponseDecoder());
@@ -114,13 +107,13 @@ public class RtspClientStackImpl implements RtspStack {
 		});
 
 		// Start the client.
-		ChannelFuture f = b.connect(getAddress(), remotePort);
+		ChannelFuture f = b.connect(getHost(), getPort());
 		try {
 			f.sync();
 			channel = f.channel();
 			
 			InetSocketAddress bindAddress = new InetSocketAddress(this.inetAddress,
-					this.remotePort);
+					this.port);
 
 			logger.info("Mobicents RTSP Client started and bound to "
 					+ bindAddress.toString());
@@ -136,7 +129,7 @@ public class RtspClientStackImpl implements RtspStack {
 		rtp.setRtpInterleaved(rtpSessions.size() * 2 + 0);
 		rtp.setRtcpInterleaved(rtpSessions.size() * 2 + 1);
 		rtp.setMediaDescription(md);
-		rtp.setServerHost(remoteHost);
+		rtp.setServerHost(host);
 		rtpSessions.add(rtp);
 		return rtp;
 	}
@@ -187,25 +180,26 @@ public class RtspClientStackImpl implements RtspStack {
 		if (channel == null || (channel != null && !channel.isOpen())) {
 			// Start the connection attempt.
 			future = bootstrap.connect(new InetSocketAddress(remoteHost, remotePort));
+
+			// Wait until the connection attempt succeeds or fails.
+			channel = future.awaitUninterruptibly().channel();
+			if (!future.isSuccess()) {
+				future.cause().printStackTrace();
+				// bootstrap.releaseExternalResources();
+				return;
+			}
 		}
 
-		// Wait until the connection attempt succeeds or fails.
-		channel = future.awaitUninterruptibly().channel();
-		if (!future.isSuccess()) {
-			future.cause().printStackTrace();
-			// bootstrap.releaseExternalResources();
-			return;
-		}
 
 		channel.writeAndFlush(rtspRequest);
 	}
 
-	public String getRemoteHost() {
-		return remoteHost;
+	public String getHost() {
+		return host;
 	}
 	
-	public int getRemotePort() {
-		return remotePort;
+	public int getPort() {
+		return port;
 	}
 
 	public void setSession(String sessionId) {

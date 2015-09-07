@@ -183,7 +183,7 @@ public class RtspController implements RtspListener {
 		}
 
 		logger.info("Sending Response " + response.toString() + " For Request " + request.toString());
-		channel.write(response);
+		channel.writeAndFlush(response);
 	}
 
 	public void onRtspResponse(HttpResponse arg0) {

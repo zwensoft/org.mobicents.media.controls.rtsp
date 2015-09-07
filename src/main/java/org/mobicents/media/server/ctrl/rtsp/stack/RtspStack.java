@@ -31,7 +31,7 @@ public interface RtspStack {
 
 	public int getPort();
 
-	public String getAddress();
+	public String getHost();
 
 	public void start() throws IOException;
 
