@@ -2,7 +2,10 @@ package org.mobicents.media.server.ctrl.rtsp.stack;
 
 import java.nio.charset.Charset;
 import java.text.ParseException;
+import java.util.Base64;
+import java.util.List;
 import java.util.Vector;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -11,6 +14,9 @@ import javax.sdp.MediaDescription;
 import javax.sdp.SdpException;
 import javax.sdp.SessionDescription;
 
+import org.apache.commons.lang.StringUtils;
+import org.mobicents.media.server.ctrl.rtsp.RtspInterleavedFrame;
+import org.mobicents.media.server.ctrl.rtsp.endpoints.RtspPacketEvent;
 import org.mobicents.media.server.ctrl.rtsp.rtp.RTPSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,13 +30,17 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.rtsp.RtspMethods;
 import io.netty.handler.codec.rtsp.RtspVersions;
+import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.handler.timeout.IdleStateHandler;
 
 public class RtspResponseHandler extends ChannelInboundHandlerAdapter {
 	private static Logger logger = LoggerFactory.getLogger(RtspResponseHandler.class);
 	private static enum RTSP {
-		UNINIT, OPTIONS, DESCRIBE, SETUP, PLAY, TEARDOWN
+		UNINIT, OPTIONS, DESCRIBE, SETUP, PLAY, TEARDOWN, PLAYING
 	};
 
 	final private RtspClientStackImpl rtspStack;
@@ -41,7 +51,7 @@ public class RtspResponseHandler extends ChannelInboundHandlerAdapter {
 	private int mediaIndex = 0;
 	private AtomicInteger cseq = new AtomicInteger(1);
 
-	public RtspResponseHandler(RtspClientStackImpl client, String url) {
+	public RtspResponseHandler(RtspClientStackImpl client) {
 		this.rtspStack = client;
 	}
 
@@ -52,6 +62,8 @@ public class RtspResponseHandler extends ChannelInboundHandlerAdapter {
 
 		sendOptions();
 		setState(RTSP.OPTIONS);
+		
+		
 	}
 
 	@Override
@@ -61,12 +73,25 @@ public class RtspResponseHandler extends ChannelInboundHandlerAdapter {
 	}
 
 	@Override
+	public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+		super.userEventTriggered(ctx, evt);
+		
+		if (evt instanceof IdleStateEvent) {
+			sendGetParameters();
+		}
+	}
+	
+	@Override
 	public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
 		
 		if (msg instanceof DefaultFullHttpResponse) {
 			messageReceive(ctx, (DefaultFullHttpResponse)msg);
-		} else {
-			logger.warn("error msg: {}", msg);;
+		} else if (msg instanceof RtspInterleavedFrame){
+			RtspInterleavedFrame rtp = (RtspInterleavedFrame)msg;
+			if (rtp.getChannel() % 2 == 0) { // rtp
+				rtspStack.dispatch(new RtspPacketEvent(rtp.getPkt()));
+			}
+			logger.debug("ignore msg: {}", msg);;
 		}
 
 		/** send next */
@@ -78,12 +103,20 @@ public class RtspResponseHandler extends ChannelInboundHandlerAdapter {
 		switch (state) {
 		case PLAY:
 			String rtpInfo = response.headers().get("RTP-Info");
-			
+
+			setState(RTSP.PLAYING);
 			break;
 		case SETUP:
 			// session
 			String sessionId = response.headers().get("Session");
-			rtspStack.setSession(sessionId);
+			if (null != sessionId) {
+				Matcher matcher = Pattern.compile("([^;]+)").matcher(sessionId);
+				if (matcher.find()) {
+					rtspStack.setSession(matcher.group(1));
+				} else {
+					rtspStack.setSession(sessionId);
+				}
+			}
 			
 			// transport
 			String transport = response.headers().get("Transport");
@@ -116,9 +149,14 @@ public class RtspResponseHandler extends ChannelInboundHandlerAdapter {
 			
 			break;
 		case DESCRIBE:
-			String sdp = response.content().toString(Charset.forName("UTF8"));
+			if (response.getStatus().code() == HttpResponseStatus.UNAUTHORIZED.code()) {
+				sendDescribe(buildAuthorizationString(response));
+				break;
+			}
+			
+			String desciptor = response.content().toString(Charset.forName("UTF8"));
 			SessionDescriptionImpl sd = new SessionDescriptionImpl();
-			StringTokenizer tokenizer = new StringTokenizer(sdp);
+			StringTokenizer tokenizer = new StringTokenizer(desciptor);
 			while (tokenizer.hasMoreChars()) {
 				String line = tokenizer.nextToken();
 
@@ -136,10 +174,24 @@ public class RtspResponseHandler extends ChannelInboundHandlerAdapter {
 			
 			mediaIndex = 0;
 			setup(sd, mediaIndex ++);
+			
+			// 心跳
+			rtspStack.getChannel().pipeline().addFirst("ping", new IdleStateHandler(30, 15, 13,TimeUnit.SECONDS));
+			
+			//
+			rtspStack.setSessionDescription(sd);
 			break;
 		case OPTIONS:
-			sendDescribe();
+			if (response.getStatus().code() == HttpResponseStatus.UNAUTHORIZED.code()) {
+				sendDescribe(buildAuthorizationString(response));
+			} else {
+				sendDescribe();
+			}
+			
 			setState(RTSP.DESCRIBE);
+			break;
+		case PLAYING:
+			logger.info("{}", response);
 			break;
 		default:
 			logger.warn("I dont't Known What to do with {}", response);
@@ -194,8 +246,37 @@ public class RtspResponseHandler extends ChannelInboundHandlerAdapter {
 	public void sendOptions()  {
 		DefaultFullHttpRequest req = new DefaultFullHttpRequest(RtspVersions.RTSP_1_0, RtspMethods.OPTIONS, rtspStack.getUrl());
 		addCSeq(req);
-
-		rtspStack.sendRquest(req, rtspStack.getHost(), rtspStack.getPort());
+		rtspStack.sendRequest(req, rtspStack.getHost(), rtspStack.getPort());
+	}
+	
+	private String buildAuthorizationString(HttpResponse request) {
+		List<String> auths = request.headers().getAll("WWW-Authenticate");
+		for(String auth : auths) {
+			if (StringUtils.startsWith(auth, "Basic")) {
+				String user = rtspStack.getUser();
+				String pass = rtspStack.getPasswd();
+				byte[] bytes = org.apache.commons.codec.binary.Base64.encodeBase64(new String(user + ":"
+						+ (pass != null ? pass : "")).getBytes());
+				String authValue = "Basic " + new String(bytes);
+				return authValue;
+				
+			}
+			else if (StringUtils.startsWith(auth, "Digest")) {
+				
+			}
+		}
+		
+		throw new UnsupportedOperationException("fail use WWW-Authenticate:" + auths.toString());
+	}
+	
+	public void sendDescribe(String auth)  {
+		DefaultFullHttpRequest req = new DefaultFullHttpRequest(RtspVersions.RTSP_1_0, RtspMethods.DESCRIBE, rtspStack.getUrl());
+		addCSeq(req);
+		req.headers().add("Accept", "application/sdp");
+		if (null != auth) {
+			req.headers().add("Authorization", auth);
+		}
+		rtspStack.sendRequest(req, rtspStack.getHost(), rtspStack.getPort());
 	}
 	
 	public void sendDescribe()  {
@@ -203,7 +284,14 @@ public class RtspResponseHandler extends ChannelInboundHandlerAdapter {
 		addCSeq(req);
 		req.headers().add("Accept", "application/sdp");
 
-		rtspStack.sendRquest(req, rtspStack.getHost(), rtspStack.getPort());
+		rtspStack.sendRequest(req, rtspStack.getHost(), rtspStack.getPort());
+	}
+	
+	public void sendGetParameters()  {
+		DefaultFullHttpRequest req = new DefaultFullHttpRequest(RtspVersions.RTSP_1_0, RtspMethods.GET_PARAMETER, rtspStack.getUrl());
+		addCSeq(req);
+
+		rtspStack.sendRequest(req, rtspStack.getHost(), rtspStack.getPort());
 	}
 
 	public void sendUDPSetup(String track, int rtp, int rtcp)  {
@@ -218,7 +306,7 @@ public class RtspResponseHandler extends ChannelInboundHandlerAdapter {
 		addCSeq(req);
 		req.headers().add("Transport", "RTP/AVP;unicast;client_port="+rtp + "-" + rtcp);
 
-		rtspStack.sendRquest(req, rtspStack.getHost(), rtspStack.getPort());
+		rtspStack.sendRequest(req, rtspStack.getHost(), rtspStack.getPort());
 	}
 	
 	/**
@@ -240,7 +328,7 @@ public class RtspResponseHandler extends ChannelInboundHandlerAdapter {
 		addCSeq(req);
 		req.headers().add("Transport", "RTP/AVP/TCP;interleaved="+rtp + "-" + rtcp);
 
-		rtspStack.sendRquest(req, rtspStack.getHost(), rtspStack.getPort());
+		rtspStack.sendRequest(req, rtspStack.getHost(), rtspStack.getPort());
 	}
 
 	public void sendPlay()  {
@@ -249,7 +337,7 @@ public class RtspResponseHandler extends ChannelInboundHandlerAdapter {
 		req.headers().add("Session", rtspStack.getSession());
 		req.headers().add("Range", "npt=0.000");
 
-		rtspStack.sendRquest(req, rtspStack.getHost(), rtspStack.getPort());
+		rtspStack.sendRequest(req, rtspStack.getHost(), rtspStack.getPort());
 	}
 
 	public void sendTeardown()  {
@@ -261,7 +349,7 @@ public class RtspResponseHandler extends ChannelInboundHandlerAdapter {
 			req.headers().add("Session", session);
 		}
 
-		rtspStack.sendRquest(req, rtspStack.getHost(), rtspStack.getPort());
+		rtspStack.sendRequest(req, rtspStack.getHost(), rtspStack.getPort());
 	}
 	
 	private void addCSeq(DefaultFullHttpRequest req) {

@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.concurrent.Callable;
 
 import org.apache.log4j.Logger;
+import org.mobicents.media.server.ctrl.rtsp.session.RtspSession;
+import org.mobicents.media.server.ctrl.rtsp.session.SessionState;
 import org.mobicents.media.server.spi.Endpoint;
 import org.mobicents.media.server.spi.player.Player;
 
@@ -57,17 +59,16 @@ public class PlayAction implements Callable<HttpResponse> {
 		URI uri = new URI(absolutePath);
 
 		String path = uri.getPath();
-
-		String filePath = rtspController.getMediaDir();
+		String filePath = null;
 		String trackID = null;
 
 		int pos = path.indexOf("/trackID");
-		if (pos > 0) {
-			filePath += path.substring(0, pos);
-			trackID = path.substring(pos + 1);
-		} else {
-			filePath += path;
-		}
+        if (pos > 0) {
+            filePath = path.substring(0, pos);
+            trackID = path.substring(pos + 1);
+        } else {
+            filePath = path;
+        }
 
 		File f = new File(filePath);
 		if (f.isDirectory() || !f.exists()) {
@@ -85,7 +86,7 @@ public class PlayAction implements Callable<HttpResponse> {
 			return response;
 		}
 		// determine session
-		Session session = rtspController.getSession(this.request.headers().get(RtspHeaders.Names.SESSION));
+		RtspSession session = rtspController.getSession(this.request.headers().get(RtspHeaders.Names.SESSION), false);
 		if (session == null) {
 			response = new DefaultHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.SESSION_NOT_FOUND);
 			response.headers().add(HttpHeaders.Names.SERVER, RtspController.SERVER);

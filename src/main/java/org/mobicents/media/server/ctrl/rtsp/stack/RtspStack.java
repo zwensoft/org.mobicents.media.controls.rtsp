@@ -37,7 +37,5 @@ public interface RtspStack {
 
 	public void stop();
 	
-	public void setRtspListener(RtspListener listener);
-	
-	public void sendRquest(HttpRequest rtspRequest, String remoteHost, int remotePort) ;
+	public void sendRequest(HttpRequest rtspRequest, String remoteHost, int remotePort) ;
 }

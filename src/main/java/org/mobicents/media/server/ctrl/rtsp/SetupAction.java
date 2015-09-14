@@ -26,14 +26,16 @@ import java.util.Date;
 import java.util.List;
 import java.util.concurrent.Callable;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
+import org.mobicents.media.server.ctrl.rtsp.session.RtspSession;
+import org.mobicents.media.server.ctrl.rtsp.session.SessionState;
 import org.mobicents.media.server.spi.Connection;
 import org.mobicents.media.server.spi.ConnectionMode;
 import org.mobicents.media.server.spi.ConnectionType;
 import org.mobicents.media.server.spi.Endpoint;
 import org.mobicents.media.server.spi.ResourceUnavailableException;
 import org.mobicents.media.server.spi.player.Player;
-import org.mobicents.media.server.utils.Text;
 
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpHeaders;
@@ -70,28 +72,19 @@ public class SetupAction implements Callable<HttpResponse> {
         this.remoteHost = remoteIp;
     }
 
-    private Session getSession(String sessionID) {
-        Session session = null;
-        
-        if (sessionID != null) {
-            session = rtspController.getSession(sessionID);
-        }
-        
-        if (session != null) {
-            return session;
-        }
-        
-        session = new Session();
-        rtspController.addSession(session);
-        
-        return session;
+    private RtspSession getSession(String sessionID) {
+    	if (StringUtils.isEmpty(sessionID)) {
+    		return null;
+    	}
+
+        return rtspController.getSession(sessionID, true);
     }
     
     public HttpResponse call() throws Exception {
     	HttpResponse response = null;
 
         //determine session
-        Session session = getSession(this.request.headers().get(RtspHeaders.Names.SESSION));
+    	RtspSession session = getSession(this.request.headers().get(RtspHeaders.Names.SESSION));
         if (session == null) {
             response = new DefaultHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.SESSION_NOT_FOUND);
             response.headers().add(HttpHeaders.Names.SERVER, RtspController.SERVER);
@@ -106,12 +99,11 @@ public class SetupAction implements Callable<HttpResponse> {
         String path = uri.getPath();
 
         int pos = path.indexOf("/trackID");
-        filePath = rtspController.getMediaDir();
         if (pos > 0) {
-            filePath += path.substring(0, pos);
+            filePath = path.substring(0, pos);
             trackID = path.substring(pos + 1);
         } else {
-            filePath += path;
+            filePath = path;
         }
         
         File f = new File(filePath);
@@ -137,8 +129,8 @@ public class SetupAction implements Callable<HttpResponse> {
         Endpoint endpoint = (Endpoint) session.getAttribute("endpoint");
         if (endpoint == null) {
             try {
-                endpoint = rtspController.getNamingService().lookup(ENDPOINT_NAME, false);
-                session.addAttribute("endpoint", endpoint);
+                endpoint = rtspController.lookup(ENDPOINT_NAME);
+                session.setAttribute("endpoint", endpoint);
             } catch (ResourceUnavailableException e) {
                 logger.warn("There is no free endpoint: " + ENDPOINT_NAME);
                 response = new DefaultHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.SERVICE_UNAVAILABLE);
@@ -154,7 +146,7 @@ public class SetupAction implements Callable<HttpResponse> {
                 connection = endpoint.createConnection(ConnectionType.RTP, false);
                 
                 connection.setMode(mode);
-                session.addAttribute("connection", connection);
+                session.setAttribute("connection", connection);
             } catch (Exception e) {
                 logger.error(e);
                 response = new DefaultHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.SERVICE_UNAVAILABLE);
@@ -173,7 +165,7 @@ public class SetupAction implements Callable<HttpResponse> {
         List<String> trackIds = (List<String>)session.getAttribute("trackIds");
         if(trackIds == null){
         	trackIds = new ArrayList<String>();
-        	session.addAttribute("trackIds", trackIds);
+        	session.setAttribute("trackIds", trackIds);
         }
         trackIds.add(trackID);
         

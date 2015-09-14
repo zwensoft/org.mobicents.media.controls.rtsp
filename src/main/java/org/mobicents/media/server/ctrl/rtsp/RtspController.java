@@ -1,20 +1,3 @@
-/*
- * JBoss, Home of Professional Open Source
- * Copyright XXXX, Red Hat Middleware LLC, and individual contributors as indicated
- * by the @authors tag. All rights reserved.
- * See the copyright.txt in the distribution for a full listing
- * of individual contributors.
- * This copyrighted material is made available to anyone wishing to use,
- * modify, copy, or redistribute it subject to the terms and conditions
- * of the GNU General Public License, v. 2.0.
- * This program is distributed in the hope that it will be useful, but WITHOUT A
- * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
- * PARTICULAR PURPOSE. See the GNU General Public License for more details.
- * You should have received a copy of the GNU General Public License,
- * v. 2.0 along with this distribution; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- * MA 02110-1301, USA.
- */
 package org.mobicents.media.server.ctrl.rtsp;
 
 import java.net.InetSocketAddress;
@@ -23,12 +6,28 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.log4j.Logger;
+import org.mobicents.media.core.naming.NamingService;
+import org.mobicents.media.core.naming.UnknownEndpointException;
+import org.mobicents.media.server.ctrl.rtsp.config.ServerConfig;
+import org.mobicents.media.server.ctrl.rtsp.endpoints.RtspConnection;
+import org.mobicents.media.server.ctrl.rtsp.endpoints.RtspEndpoint;
+import org.mobicents.media.server.ctrl.rtsp.session.BaseSession;
+import org.mobicents.media.server.ctrl.rtsp.session.BasicSessionStore;
+import org.mobicents.media.server.ctrl.rtsp.session.DefaultSessionAccessor;
+import org.mobicents.media.server.ctrl.rtsp.session.RtspSession;
+import org.mobicents.media.server.ctrl.rtsp.session.RtspSessionAccessor;
+import org.mobicents.media.server.ctrl.rtsp.session.RtspSessionKeyFactory;
+import org.mobicents.media.server.ctrl.rtsp.session.SimpleRandomKeyFactory;
 import org.mobicents.media.server.ctrl.rtsp.stack.RtspListener;
 import org.mobicents.media.server.ctrl.rtsp.stack.RtspServerStackImpl;
-import org.mobicents.media.server.spi.NamingService;
+import org.mobicents.media.server.io.network.UdpManager;
+import org.mobicents.media.server.scheduler.Scheduler;
+import org.mobicents.media.server.scheduler.Task;
+import org.mobicents.media.server.spi.Endpoint;
+import org.mobicents.media.server.spi.ResourceUnavailableException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import io.netty.channel.Channel;
 import io.netty.handler.codec.http.DefaultHttpResponse;
@@ -43,84 +42,35 @@ import io.netty.handler.codec.rtsp.RtspMethods;
 import io.netty.handler.codec.rtsp.RtspResponseStatuses;
 import io.netty.handler.codec.rtsp.RtspVersions;
 
-/**
- * 
- * @author amit bhayani
- * 
- */
 public class RtspController implements RtspListener {
-
-	private static final Logger logger = Logger.getLogger(RtspController.class);
-
-	public static final String SERVER = "Mobicents Media Server";
-
-	private RtspServerStackImpl serverStack = null;
-	private String bindAddress = "127.0.0.1";
-	private int port = 554;
-	private NamingService namingService;
-	private String mediaDir = null;
-
+	private static Logger logger = LoggerFactory.getLogger(RtspController.class);
+	public static final String SERVER = "RtspServer";
+	public static final String REQUIRE_VALUE_NGOD_R2 = "com.comcast.ngod.r2";
+	public static final String REQUIRE_VALUE_NGOD_C1 = "com.comcast.ngod.c1";
 	private static final String DATE_PATTERN = "EEE, d MMM yyyy HH:mm:ss z";
-	private static final SimpleDateFormat formatter = new SimpleDateFormat(DATE_PATTERN);
 
-	private ConcurrentHashMap<String, Session> sessions = new ConcurrentHashMap<String, Session>();
+	public static final RtspSessionAccessor sessionAccessor = new DefaultSessionAccessor();
+	public static final RtspSessionKeyFactory keyFactory = new SimpleRandomKeyFactory();
+
+	private String ip;
+	private int port;
+	private ServerConfig serverConfig;
+	private RtspServerStackImpl server = null;
+	private NamingService namingService = new NamingService();
 	
-	private Set<String> endpoints;
-
-	public String getBindAddress() {
-		return this.bindAddress;
-	}
-
-	public void setBindAddress(String bindAddress) throws UnknownHostException {
-		this.bindAddress = bindAddress;
-	}
-
-	public int getPort() {
-		return this.port;
-	}
-
-	public void setPort(int port) {
-		this.port = port;
-	}
-
-	public String getMediaDir() {
-		return mediaDir;
-	}
-
-	public void setMediaDir(String mediaDir) {
-		this.mediaDir = mediaDir;
-	}
-
-	public NamingService getNamingService() {
-		return namingService;
-	}
-
-	public void setNamingService(NamingService namingService) {
-		this.namingService = namingService;
-	}
-
-	public void create() {
-		logger.info("Starting RTSP Controller module for MMS");
-	}
+	private Scheduler scheduler;
+	private UdpManager udpManager;
+	private BasicSessionStore sessionStore;
 
 	public void start() throws Exception {
-		this.serverStack = new RtspServerStackImpl(this.bindAddress, this.port);
-		this.serverStack.setRtspListener(this);
-		this.serverStack.start();
-
-		logger
-				.info("Started RTSP Controller module for MMS. Bound at IP " + this.bindAddress + " at port "
-						+ this.port);
+		this.server = new RtspServerStackImpl(ip, port);
+		this.server.setRtspListener(this);
+		this.server.start();
+		logger.debug("Started Rtsp Server. ");
 	}
 
 	public void stop() {
-		logger.info("Stoping RTSP Controller module for MMS. Listening at IP " + this.bindAddress + " port "
-				+ this.port);
-		this.serverStack.stop();
-	}
-
-	public void destroy() {
-		logger.info("Stopped RTSP Controller module for MMS");
+		this.server.stop();
 	}
 
 	public void onRtspRequest(HttpRequest request, Channel channel) {
@@ -148,7 +98,7 @@ public class RtspController implements RtspListener {
 				response = action.call();
 			} else if (request.getMethod().equals(HttpMethod.GET)) {
 
-				String date = formatter.format(new Date());
+				String date = new SimpleDateFormat(DATE_PATTERN).format(new Date());
 
 				response = new DefaultHttpResponse(HttpVersion.HTTP_1_0, HttpResponseStatus.OK);
 				response.headers().add(HttpHeaders.Names.SERVER, RtspController.SERVER);
@@ -166,7 +116,8 @@ public class RtspController implements RtspListener {
 
 				return;
 
-				// response = new DefaultHttpResponse(HttpVersion.HTTP_1_0, HttpResponseStatus.NOT_IMPLEMENTED);
+				// response = new DefaultHttpResponse(HttpVersion.HTTP_1_0,
+				// HttpResponseStatus.NOT_IMPLEMENTED);
 			} else {
 				response = new DefaultHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.METHOD_NOT_ALLOWED);
 				response.headers().add(HttpHeaders.Names.SERVER, RtspController.SERVER);
@@ -186,29 +137,64 @@ public class RtspController implements RtspListener {
 		channel.writeAndFlush(response);
 	}
 
-	public void onRtspResponse(HttpResponse arg0) {
-		// TODO Auto-generated method stub
+	@Override
+	public void onRtspResponse(HttpResponse response) {
 
 	}
 
-	protected Session getSession(String sessionId) {
-		return this.sessions.get(sessionId);
+	/*-----------Setter And Getter --------------*/
+
+	public String getIp() {
+		return ip;
 	}
 
-	protected void addSession(Session session) {
-		this.sessions.put(session.getId(), session);
+	public void setIp(String ip) {
+		this.ip = ip;
 	}
 
-	protected void removeSession(String sessionId) {
-		this.sessions.remove(sessionId);
+	public int getPort() {
+		return port;
 	}
+
+	public void setPort(int port) {
+		this.port = port;
+	}
+
+	public ServerConfig getServerConfig() {
+		return serverConfig;
+	}
+
+	public void setServerConfig(ServerConfig serverConfig) {
+		this.serverConfig = serverConfig;
+	}
+
+	public Endpoint lookup(String name) throws ResourceUnavailableException, UnknownEndpointException {
+		Endpoint endpoint = namingService.lookup(name, false);
+		if (null == endpoint) {
+			try {
+				endpoint = new RtspEndpoint(name, name, udpManager);
+				endpoint.start();
+				
+				namingService.register(endpoint);
+				Endpoint stored = namingService.lookup(name, false);
+				if (stored != endpoint) { // open two same endpoint, close one
+					endpoint.stop();
+					endpoint = stored;
+				}
+			} catch (UnknownHostException e) {
+				throw new ResourceUnavailableException("fail open ", e);
+			}
+		}
+
+		return endpoint;
+	}
+	
 
 	public Set<String> getEndpoints() {
-		return endpoints;
+		return null;
 	}
 
-	public void setEndpoints(Set<String> endpoints) {
-		this.endpoints = endpoints;
+	public RtspSession getSession(String sessionID, boolean create) {
+		return sessionStore.newSession(sessionID, create);
 	}
-
 }

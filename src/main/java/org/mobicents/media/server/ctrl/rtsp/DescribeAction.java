@@ -23,11 +23,13 @@ import java.util.Date;
 import java.util.concurrent.Callable;
 
 import org.apache.log4j.Logger;
+import org.mobicents.media.core.endpoints.impl.ConferenceEndpoint;
+import org.mobicents.media.server.spi.Connection;
 import org.mobicents.media.server.spi.ConnectionType;
 import org.mobicents.media.server.spi.Endpoint;
 import org.mobicents.media.server.spi.ResourceUnavailableException;
 
-import io.netty.buffer.ByteBufUtil;
+import io.netty.bootstrap.ChannelFactory;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpResponse;
@@ -66,7 +68,7 @@ public class DescribeAction implements Callable<HttpResponse> {
 
 		RequestParser reqParser = new RequestParser(mediaPath, this.rtspController.getEndpoints());
 		String endpointName = reqParser.getEndpointName();
-
+		
 		if (endpointName == null) {
 			logger.warn("No EndpointName passed in request " + mediaPath);
 			response = new DefaultHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.SERVICE_UNAVAILABLE);
@@ -74,12 +76,15 @@ public class DescribeAction implements Callable<HttpResponse> {
 			response.headers().set(RtspHeaders.Names.CSEQ, this.request.headers().get(RtspHeaders.Names.CSEQ));
 			return response;
 		}
-
-		Endpoint endpoint = null;
+		
+		
 		String sdp = null;
+		Connection conn = null;
+		Endpoint endpoint = null;
 		try {
-			endpoint = rtspController.getNamingService().lookup(endpointName, true);
-			sdp = endpoint.createConnection(ConnectionType.RTP, false).getRemoteDescriptor();
+			endpoint = rtspController.lookup(endpointName);
+			conn = endpoint.createConnection(ConnectionType.LOCAL, true);
+			sdp = conn.getDescriptor();
 		} catch (ResourceUnavailableException e) {
 			logger.warn("There is no free endpoint: " + endpointName);
 			response = new DefaultHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.SERVICE_UNAVAILABLE);

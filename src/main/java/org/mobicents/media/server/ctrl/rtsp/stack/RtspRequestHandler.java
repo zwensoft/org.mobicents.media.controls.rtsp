@@ -1,12 +1,12 @@
 package org.mobicents.media.server.ctrl.rtsp.stack;
 
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.handler.codec.http.DefaultFullHttpRequest;
-import io.netty.util.CharsetUtil;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.util.CharsetUtil;
 
 public class RtspRequestHandler extends ChannelInboundHandlerAdapter {
   private static Logger logger = LoggerFactory.getLogger(RtspRequestHandler.class);
@@ -18,8 +18,8 @@ public class RtspRequestHandler extends ChannelInboundHandlerAdapter {
 
   @Override
   public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-    if (msg instanceof DefaultFullHttpRequest) {
-      DefaultFullHttpRequest request = (DefaultFullHttpRequest) msg;
+    if (msg instanceof FullHttpRequest) {
+    	FullHttpRequest request = (FullHttpRequest) msg;
       logger.debug("client request ========>\n{}\n\n{}", request.toString(), request.content()
           .toString(CharsetUtil.UTF_8));
       rtspServerStackImpl.processRtspRequest(request, ctx.channel());

@@ -19,6 +19,7 @@ package org.mobicents.media.server.ctrl.rtsp;
 
 import java.util.concurrent.Callable;
 
+import org.mobicents.media.server.ctrl.rtsp.session.RtspSession;
 import org.mobicents.media.server.spi.Endpoint;
 
 import io.netty.handler.codec.http.DefaultHttpResponse;
@@ -48,7 +49,7 @@ public class TeardownAction implements Callable<HttpResponse> {
 		HttpResponse response = null;
 		String sessionId = this.request.headers().get(RtspHeaders.Names.SESSION);
 		if (sessionId != null) {
-			Session session = this.rtspController.getSession(sessionId);
+			RtspSession session = this.rtspController.getSession(sessionId, false);
 			if (session != null) {
 
 		        Endpoint endpoint = (Endpoint) session.getAttribute("endpoint");
