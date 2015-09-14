@@ -17,6 +17,7 @@
 			<version>4.0.28.Final</version>
 		</dependency>
 
+
 		<!-- logging begin -->
 		<dependency>
 			<groupId>org.slf4j</groupId>
@@ -35,6 +36,18 @@
 		</dependency>
 		<!-- logging end -->
 
+		<!-- utils begin -->
+		<dependency>
+			<groupId>commons-lang</groupId>
+			<artifactId>commons-lang</artifactId>
+			<version>2.5</version>
+		</dependency>
+		<dependency>
+		  <groupId>commons-codec</groupId>
+		  <artifactId>commons-codec</artifactId>
+		  <version>1.9</version>
+		</dependency>
+		<!-- utils end -->
 
 		<dependency>
 			<groupId>org.mobicents.media</groupId>
@@ -76,6 +89,12 @@
 			<artifactId>network</artifactId>
 			<version>${project.version}</version>
 			<type>jar</type>
+		</dependency>
+
+		<dependency>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
+			<version>4.8.1</version>
 		</dependency>
 	</dependencies>
 
