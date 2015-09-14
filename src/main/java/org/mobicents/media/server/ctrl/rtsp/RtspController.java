@@ -30,7 +30,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
@@ -73,9 +75,10 @@ public class RtspController implements RtspListener {
 		this.server.stop();
 	}
 
-	public void onRtspRequest(HttpRequest request, Channel channel) {
+	@Override
+	public void onRtspRequest(HttpRequest request, ChannelHandlerContext ctx) {
 		logger.info("Receive request " + request);
-		Callable<HttpResponse> action = null;
+		Callable<FullHttpResponse> action = null;
 		HttpResponse response = null;
 		try {
 
@@ -86,7 +89,7 @@ public class RtspController implements RtspListener {
 				action = new DescribeAction(this, request);
 				response = action.call();
 			} else if (request.getMethod().equals(RtspMethods.SETUP)) {
-				InetSocketAddress inetSocketAddress = (InetSocketAddress) channel.remoteAddress();
+				InetSocketAddress inetSocketAddress = (InetSocketAddress) ctx.channel().remoteAddress();
 				String remoteIp = inetSocketAddress.getAddress().getHostAddress();
 				action = new SetupAction(this, request, remoteIp);
 				response = action.call();
@@ -134,7 +137,7 @@ public class RtspController implements RtspListener {
 		}
 
 		logger.info("Sending Response " + response.toString() + " For Request " + request.toString());
-		channel.writeAndFlush(response);
+		ctx.writeAndFlush(response);
 	}
 
 	@Override

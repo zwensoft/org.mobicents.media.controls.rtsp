@@ -22,7 +22,9 @@ public class RtspRequestHandler extends ChannelInboundHandlerAdapter {
     	FullHttpRequest request = (FullHttpRequest) msg;
       logger.debug("client request ========>\n{}\n\n{}", request.toString(), request.content()
           .toString(CharsetUtil.UTF_8));
-      rtspServerStackImpl.processRtspRequest(request, ctx.channel());
+      
+     
+      rtspServerStackImpl.processRtspRequest(request, ctx);
     }
   }
 

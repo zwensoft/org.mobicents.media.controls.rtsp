@@ -28,10 +28,10 @@ import org.mobicents.media.server.ctrl.rtsp.session.SessionState;
 import org.mobicents.media.server.spi.Endpoint;
 import org.mobicents.media.server.spi.player.Player;
 
-import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.rtsp.RtspHeaders;
 import io.netty.handler.codec.rtsp.RtspResponseStatuses;
 import io.netty.handler.codec.rtsp.RtspVersions;
@@ -41,7 +41,7 @@ import io.netty.handler.codec.rtsp.RtspVersions;
  * @author amit bhayani
  * 
  */
-public class PlayAction implements Callable<HttpResponse> {
+public class PlayAction implements Callable<FullHttpResponse> {
 
 	private static Logger logger = Logger.getLogger(PlayAction.class);
 	private RtspController rtspController = null;
@@ -52,8 +52,8 @@ public class PlayAction implements Callable<HttpResponse> {
 		this.request = request;
 	}
 
-	public HttpResponse call() throws Exception {
-		HttpResponse response = null;
+	public FullHttpResponse call() throws Exception {
+		FullHttpResponse response = null;
 		String sessionId = this.request.headers().get(RtspHeaders.Names.SESSION);
 		String absolutePath = this.request.getUri();
 		URI uri = new URI(absolutePath);
@@ -72,7 +72,7 @@ public class PlayAction implements Callable<HttpResponse> {
 
 		File f = new File(filePath);
 		if (f.isDirectory() || !f.exists()) {
-			response = new DefaultHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.NOT_FOUND);
+			response = new DefaultFullHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.NOT_FOUND);
 			response.headers().add(HttpHeaders.Names.SERVER, RtspController.SERVER);
 			response.headers().add(RtspHeaders.Names.CSEQ, this.request.headers().get(RtspHeaders.Names.CSEQ));
 			return response;
@@ -80,7 +80,7 @@ public class PlayAction implements Callable<HttpResponse> {
 
 		String sessionID = this.request.headers().get(RtspHeaders.Names.SESSION);
 		if (sessionID == null) {
-			response = new DefaultHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.BAD_REQUEST);
+			response = new DefaultFullHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.BAD_REQUEST);
 			response.headers().add(HttpHeaders.Names.SERVER, RtspController.SERVER);
 			response.headers().add(RtspHeaders.Names.CSEQ, this.request.headers().get(RtspHeaders.Names.CSEQ));
 			return response;
@@ -88,7 +88,7 @@ public class PlayAction implements Callable<HttpResponse> {
 		// determine session
 		RtspSession session = rtspController.getSession(this.request.headers().get(RtspHeaders.Names.SESSION), false);
 		if (session == null) {
-			response = new DefaultHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.SESSION_NOT_FOUND);
+			response = new DefaultFullHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.SESSION_NOT_FOUND);
 			response.headers().add(HttpHeaders.Names.SERVER, RtspController.SERVER);
 			response.headers().add(RtspHeaders.Names.CSEQ, this.request.headers().get(RtspHeaders.Names.CSEQ));
 			return response;
@@ -122,7 +122,7 @@ public class PlayAction implements Callable<HttpResponse> {
 //			player.start();
 		}
 
-		response = new DefaultHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.OK);
+		response = new DefaultFullHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.OK);
 		response.headers().add(HttpHeaders.Names.SERVER, RtspController.SERVER);
 		response.headers().add(RtspHeaders.Names.CSEQ, this.request.headers().get(RtspHeaders.Names.CSEQ));
 		response.headers().add(RtspHeaders.Names.SESSION, session.getId());

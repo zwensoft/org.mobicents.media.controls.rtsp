@@ -37,10 +37,11 @@ import org.mobicents.media.server.spi.Endpoint;
 import org.mobicents.media.server.spi.ResourceUnavailableException;
 import org.mobicents.media.server.spi.player.Player;
 
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.rtsp.RtspHeaders;
 import io.netty.handler.codec.rtsp.RtspResponseStatuses;
 import io.netty.handler.codec.rtsp.RtspVersions;
@@ -50,7 +51,7 @@ import io.netty.handler.codec.rtsp.RtspVersions;
  * @author amit bhayani
  * 
  */
-public class SetupAction implements Callable<HttpResponse> {
+public class SetupAction implements Callable<FullHttpResponse> {
 
     // TODO : Multicast not taken care
     // TODO : Only UDP is supported, check that no TCP in Transport
@@ -80,13 +81,13 @@ public class SetupAction implements Callable<HttpResponse> {
         return rtspController.getSession(sessionID, true);
     }
     
-    public HttpResponse call() throws Exception {
-    	HttpResponse response = null;
+    public FullHttpResponse call() throws Exception {
+    	FullHttpResponse response = null;
 
         //determine session
     	RtspSession session = getSession(this.request.headers().get(RtspHeaders.Names.SESSION));
         if (session == null) {
-            response = new DefaultHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.SESSION_NOT_FOUND);
+            response = new DefaultFullHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.SESSION_NOT_FOUND);
             response.headers().add(HttpHeaders.Names.SERVER, RtspController.SERVER);
             response.headers().add(RtspHeaders.Names.CSEQ, this.request.headers().get(RtspHeaders.Names.CSEQ));
             return response;
@@ -108,7 +109,7 @@ public class SetupAction implements Callable<HttpResponse> {
         
         File f = new File(filePath);
         if (f.isDirectory() || !f.exists()) {
-                response = new DefaultHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.NOT_FOUND);
+                response = new DefaultFullHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.NOT_FOUND);
                 response.headers().add(HttpHeaders.Names.SERVER, RtspController.SERVER);
                 response.headers().add(RtspHeaders.Names.CSEQ, this.request.headers().get(RtspHeaders.Names.CSEQ));
                 return response;
@@ -120,7 +121,7 @@ public class SetupAction implements Callable<HttpResponse> {
         if (session.getState() == SessionState.PLAYING || 
                 session.getState() == SessionState.RECORDING) {
             // We don't support changing the Transport while state is PLAYING or RECORDING
-            response = new DefaultHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.METHOD_NOT_VALID);
+            response = new DefaultFullHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.METHOD_NOT_VALID);
             response.headers().add(HttpHeaders.Names.SERVER, RtspController.SERVER);
             response.headers().add(RtspHeaders.Names.CSEQ, this.request.headers().get(RtspHeaders.Names.CSEQ));
             return response;
@@ -133,7 +134,7 @@ public class SetupAction implements Callable<HttpResponse> {
                 session.setAttribute("endpoint", endpoint);
             } catch (ResourceUnavailableException e) {
                 logger.warn("There is no free endpoint: " + ENDPOINT_NAME);
-                response = new DefaultHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.SERVICE_UNAVAILABLE);
+                response = new DefaultFullHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.SERVICE_UNAVAILABLE);
                 response.headers().add(HttpHeaders.Names.SERVER, RtspController.SERVER);
                 response.headers().add(RtspHeaders.Names.CSEQ, this.request.headers().get(RtspHeaders.Names.CSEQ));
                 return response;
@@ -149,7 +150,7 @@ public class SetupAction implements Callable<HttpResponse> {
                 session.setAttribute("connection", connection);
             } catch (Exception e) {
                 logger.error(e);
-                response = new DefaultHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.SERVICE_UNAVAILABLE);
+                response = new DefaultFullHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.SERVICE_UNAVAILABLE);
                 response.headers().add(HttpHeaders.Names.SERVER, RtspController.SERVER);
                 response.headers().add(RtspHeaders.Names.CSEQ, this.request.headers().get(RtspHeaders.Names.CSEQ));
                 return response;
@@ -178,7 +179,7 @@ public class SetupAction implements Callable<HttpResponse> {
         
         String transport = "RTP/AVP/UDP;unicast;source="+source + ";"+this.clientPort + ";server_port=" + port + "-" + port +
                 ";ssrc=" + Integer.toHexString(ssrc);
-        response = new DefaultHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.OK);
+        response = new DefaultFullHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.OK);
         response.headers().add(HttpHeaders.Names.SERVER, RtspController.SERVER);
         response.headers().add(RtspHeaders.Names.CSEQ, this.request.headers().get(RtspHeaders.Names.CSEQ));
         response.headers().add(RtspHeaders.Names.SESSION, session.getId());

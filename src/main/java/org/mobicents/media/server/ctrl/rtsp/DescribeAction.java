@@ -23,19 +23,17 @@ import java.util.Date;
 import java.util.concurrent.Callable;
 
 import org.apache.log4j.Logger;
-import org.mobicents.media.core.endpoints.impl.ConferenceEndpoint;
 import org.mobicents.media.server.spi.Connection;
 import org.mobicents.media.server.spi.ConnectionType;
 import org.mobicents.media.server.spi.Endpoint;
 import org.mobicents.media.server.spi.ResourceUnavailableException;
 
-import io.netty.bootstrap.ChannelFactory;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.rtsp.RtspHeaders;
 import io.netty.handler.codec.rtsp.RtspResponseStatuses;
 import io.netty.handler.codec.rtsp.RtspVersions;
@@ -45,7 +43,7 @@ import io.netty.handler.codec.rtsp.RtspVersions;
  * @author amit bhayani
  * 
  */
-public class DescribeAction implements Callable<HttpResponse> {
+public class DescribeAction implements Callable<FullHttpResponse> {
 
 	private static Logger logger = Logger.getLogger(DescribeAction.class);
 	private RtspController rtspController = null;
@@ -59,8 +57,8 @@ public class DescribeAction implements Callable<HttpResponse> {
 		this.request = request;
 	}
 
-	public HttpResponse call() throws Exception {
-		DefaultHttpResponse response = null;
+	public FullHttpResponse call() throws Exception {
+		FullHttpResponse response = null;
 
 		URI objUri = new URI(this.request.getUri());
 
@@ -71,7 +69,7 @@ public class DescribeAction implements Callable<HttpResponse> {
 		
 		if (endpointName == null) {
 			logger.warn("No EndpointName passed in request " + mediaPath);
-			response = new DefaultHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.SERVICE_UNAVAILABLE);
+			response = new DefaultFullHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.SERVICE_UNAVAILABLE);
 			response.headers().set(HttpHeaders.Names.SERVER, RtspController.SERVER);
 			response.headers().set(RtspHeaders.Names.CSEQ, this.request.headers().get(RtspHeaders.Names.CSEQ));
 			return response;
@@ -87,7 +85,7 @@ public class DescribeAction implements Callable<HttpResponse> {
 			sdp = conn.getDescriptor();
 		} catch (ResourceUnavailableException e) {
 			logger.warn("There is no free endpoint: " + endpointName);
-			response = new DefaultHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.SERVICE_UNAVAILABLE);
+			response = new DefaultFullHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.SERVICE_UNAVAILABLE);
 			response.headers().add(HttpHeaders.Names.SERVER, RtspController.SERVER);
 			response.headers().add(RtspHeaders.Names.CSEQ, this.request.headers().get(RtspHeaders.Names.CSEQ));
 			return response;

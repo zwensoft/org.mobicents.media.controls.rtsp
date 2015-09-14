@@ -19,7 +19,8 @@ package org.mobicents.media.server.ctrl.rtsp;
 
 import java.util.concurrent.Callable;
 
-import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
@@ -33,7 +34,7 @@ import io.netty.handler.codec.rtsp.RtspVersions;
  * @author amit bhayani
  *
  */
-public class OptionsAction implements Callable<HttpResponse> {
+public class OptionsAction implements Callable<FullHttpResponse> {
 
 	private RtspController rtspController = null;
 	private HttpRequest request = null;
@@ -45,8 +46,8 @@ public class OptionsAction implements Callable<HttpResponse> {
 		this.request = request;
 	}
 
-	public HttpResponse call() throws Exception {
-		HttpResponse response = new DefaultHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.OK);
+	public FullHttpResponse call() throws Exception {
+		DefaultFullHttpResponse response = new DefaultFullHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.OK);
 		response.headers().add(HttpHeaders.Names.SERVER, RtspController.SERVER);
 		response.headers().add(RtspHeaders.Names.CSEQ, this.request.headers().get(RtspHeaders.Names.CSEQ));
 		response.headers().add(RtspHeaders.Names.PUBLIC, OPTIONS);

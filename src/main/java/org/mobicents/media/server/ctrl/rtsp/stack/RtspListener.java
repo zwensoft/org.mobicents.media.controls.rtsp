@@ -18,6 +18,7 @@
 package org.mobicents.media.server.ctrl.rtsp.stack;
 
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 
@@ -27,7 +28,7 @@ import io.netty.handler.codec.http.HttpResponse;
  * 
  */
 public interface RtspListener {
-	public void onRtspRequest(HttpRequest request, Channel chanel);
+	public void onRtspRequest(HttpRequest request, ChannelHandlerContext ctx);
 
 	public void onRtspResponse(HttpResponse response);
 }

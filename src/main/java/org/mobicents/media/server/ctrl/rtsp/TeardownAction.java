@@ -22,10 +22,10 @@ import java.util.concurrent.Callable;
 import org.mobicents.media.server.ctrl.rtsp.session.RtspSession;
 import org.mobicents.media.server.spi.Endpoint;
 
-import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.rtsp.RtspHeaders;
 import io.netty.handler.codec.rtsp.RtspResponseStatuses;
 import io.netty.handler.codec.rtsp.RtspVersions;
@@ -35,7 +35,7 @@ import io.netty.handler.codec.rtsp.RtspVersions;
  * @author amit bhayani
  * 
  */
-public class TeardownAction implements Callable<HttpResponse> {
+public class TeardownAction implements Callable<FullHttpResponse> {
 
 	private RtspController rtspController = null;
 	private HttpRequest request = null;
@@ -45,8 +45,8 @@ public class TeardownAction implements Callable<HttpResponse> {
 		this.request = request;
 	}
 
-	public HttpResponse call() throws Exception {
-		HttpResponse response = null;
+	public FullHttpResponse call() throws Exception {
+		FullHttpResponse response = null;
 		String sessionId = this.request.headers().get(RtspHeaders.Names.SESSION);
 		if (sessionId != null) {
 			RtspSession session = this.rtspController.getSession(sessionId, false);
@@ -57,7 +57,7 @@ public class TeardownAction implements Callable<HttpResponse> {
 		        	endpoint.deleteAllConnections();
 		        }
 
-				response = new DefaultHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.OK);
+				response = new DefaultFullHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.OK);
 				response.headers().add(HttpHeaders.Names.SERVER, RtspController.SERVER);
 				response.headers().add(RtspHeaders.Names.CSEQ, this.request.headers().get(RtspHeaders.Names.CSEQ));
 				response.headers().add(RtspHeaders.Names.SESSION, session.getId());
@@ -67,7 +67,7 @@ public class TeardownAction implements Callable<HttpResponse> {
 				return response;
 
 			} else {
-				response = new DefaultHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.SESSION_NOT_FOUND);
+				response = new DefaultFullHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.SESSION_NOT_FOUND);
 				response.headers().add(HttpHeaders.Names.SERVER, RtspController.SERVER);
 				response.headers().add(RtspHeaders.Names.CSEQ, this.request.headers().get(RtspHeaders.Names.CSEQ));
 				response.headers().add(RtspHeaders.Names.SESSION, sessionId);
@@ -75,7 +75,7 @@ public class TeardownAction implements Callable<HttpResponse> {
 			}
 
 		} else {
-			response = new DefaultHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.BAD_REQUEST);
+			response = new DefaultFullHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.BAD_REQUEST);
 			response.headers().add(HttpHeaders.Names.SERVER, RtspController.SERVER);
 			response.headers().add(RtspHeaders.Names.CSEQ, this.request.headers().get(RtspHeaders.Names.CSEQ));
 			return response;

@@ -8,16 +8,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
-import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.rtsp.RtspHeaders;
 import io.netty.handler.codec.rtsp.RtspHeaders.Names;
 import io.netty.handler.codec.rtsp.RtspResponseStatuses;
 import io.netty.handler.codec.rtsp.RtspVersions;
 
-public class PauseAction implements Callable<HttpResponse> {
+public class PauseAction implements Callable<FullHttpResponse> {
   private static Logger logger = LoggerFactory.getLogger(PauseAction.class);
   private HttpRequest request = null;
 
@@ -25,8 +24,8 @@ public class PauseAction implements Callable<HttpResponse> {
     this.request = request;
   }
 
-  public HttpResponse call() throws Exception {
-    HttpResponse response = null;
+  public FullHttpResponse call() throws Exception {
+	FullHttpResponse response = null;
     // get cesq
     String cseq = request.headers().get(Names.CSEQ);
     if (null == cseq || "".equals(cseq)) {
@@ -55,7 +54,7 @@ public class PauseAction implements Callable<HttpResponse> {
 
     String sessionKey = this.request.headers().get(Names.SESSION);
     if (null == sessionKey || "".equals(sessionKey)) {
-      response = new DefaultHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.BAD_REQUEST);
+      response = new DefaultFullHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.BAD_REQUEST);
       response.headers().set(Names.SERVER, RtspController.SERVER);
       response.headers().set(Names.CSEQ, request.headers().get(Names.CSEQ));
       response.headers().set("OnDemandSessionId", request.headers().get("OnDemandSessionId"));
@@ -66,14 +65,14 @@ public class PauseAction implements Callable<HttpResponse> {
     RtspSession rtspSession = RtspController.sessionAccessor.getSession(sessionKey, false);
     if (null == rtspSession) {
       logger.error("rtspSession is null.");
-      response = new DefaultHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.BAD_REQUEST);
+      response = new DefaultFullHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.BAD_REQUEST);
       response.headers().set(Names.SERVER, RtspController.SERVER);
       response.headers().set(Names.CSEQ, request.headers().get(Names.CSEQ));
       response.headers().set("OnDemandSessionId", request.headers().get("OnDemandSessionId"));
       return response;
     }
 
-    response = new DefaultHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.OK);
+    response = new DefaultFullHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.OK);
     response.headers().set(Names.CSEQ, request.headers().get(Names.CSEQ));
     response.headers().set("OnDemandSessionId", request.headers().get("OnDemandSessionId"));
     response.headers().set(RtspHeaders.Names.DATE, DateUtil.getGmtDate());

@@ -2,6 +2,7 @@ package org.mobicents.media.server.ctrl.rtsp.stack;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
@@ -47,9 +48,9 @@ public class RtspServerStackImpl implements RtspStack {
     throw new UnsupportedOperationException("Not Supported yet");
   }
 
-  protected void processRtspRequest(HttpRequest rtspRequest, Channel channel) {
+  protected void processRtspRequest(HttpRequest rtspRequest, ChannelHandlerContext ctx) {
     synchronized (this.listener) {
-      listener.onRtspRequest(rtspRequest, channel);
+      listener.onRtspRequest(rtspRequest, ctx);
     }
   }
 
