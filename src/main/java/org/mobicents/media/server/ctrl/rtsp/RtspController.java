@@ -4,8 +4,11 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
+
+import javax.sdp.MediaDescription;
 
 import org.mobicents.media.core.naming.NamingService;
 import org.mobicents.media.core.naming.UnknownEndpointException;
@@ -171,13 +174,17 @@ public class RtspController implements RtspListener {
 		this.serverConfig = serverConfig;
 	}
 
+	public MediaDescription describe(String srcUrl) {
+		return null;
+	}
+
 	public Endpoint lookup(String name) throws ResourceUnavailableException, UnknownEndpointException {
 		Endpoint endpoint = namingService.lookup(name, false);
 		if (null == endpoint) {
 			try {
 				endpoint = new RtspEndpoint(name, name, udpManager);
 				endpoint.start();
-				
+
 				namingService.register(endpoint);
 				Endpoint stored = namingService.lookup(name, false);
 				if (stored != endpoint) { // open two same endpoint, close one
@@ -194,7 +201,10 @@ public class RtspController implements RtspListener {
 	
 
 	public Set<String> getEndpoints() {
-		return null;
+		HashSet<String> endpoints = new HashSet<String>();
+		endpoints.add("default");
+		
+		return endpoints;
 	}
 
 	public RtspSession getSession(String sessionID, boolean create) {

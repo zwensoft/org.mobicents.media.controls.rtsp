@@ -22,6 +22,8 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.concurrent.Callable;
 
+import javax.sdp.MediaDescription;
+
 import org.apache.log4j.Logger;
 import org.mobicents.media.server.spi.Connection;
 import org.mobicents.media.server.spi.ConnectionType;
@@ -50,7 +52,6 @@ public class DescribeAction implements Callable<FullHttpResponse> {
 	private HttpRequest request = null;
 
 	private static final String DATE_PATTERN = "EEE, d MMM yyyy HH:mm:ss z";
-	private static final SimpleDateFormat formatter = new SimpleDateFormat(DATE_PATTERN);
 
 	public DescribeAction(RtspController rtspController, HttpRequest request) {
 		this.rtspController = rtspController;
@@ -62,29 +63,24 @@ public class DescribeAction implements Callable<FullHttpResponse> {
 
 		URI objUri = new URI(this.request.getUri());
 
-		String mediaPath = objUri.getPath();
-
-		RequestParser reqParser = new RequestParser(mediaPath, this.rtspController.getEndpoints());
-		String endpointName = reqParser.getEndpointName();
+		String srcUrl = objUri.getPath();
+		MediaDescription description = rtspController.describe(srcUrl);
 		
-		if (endpointName == null) {
-			logger.warn("No EndpointName passed in request " + mediaPath);
-			response = new DefaultFullHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.SERVICE_UNAVAILABLE);
+		/** not found */
+		if (description == null) {
+			logger.warn("No EndpointName passed in request " + srcUrl);
+			response = new DefaultFullHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.NOT_FOUND);
 			response.headers().set(HttpHeaders.Names.SERVER, RtspController.SERVER);
 			response.headers().set(RtspHeaders.Names.CSEQ, this.request.headers().get(RtspHeaders.Names.CSEQ));
 			return response;
 		}
 		
-		
+		/***/
 		String sdp = null;
-		Connection conn = null;
-		Endpoint endpoint = null;
 		try {
-			endpoint = rtspController.lookup(endpointName);
-			conn = endpoint.createConnection(ConnectionType.LOCAL, true);
-			sdp = conn.getDescriptor();
+			
 		} catch (ResourceUnavailableException e) {
-			logger.warn("There is no free endpoint: " + endpointName);
+			logger.warn("There is no free endpoint: " + srcUrl);
 			response = new DefaultFullHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.SERVICE_UNAVAILABLE);
 			response.headers().add(HttpHeaders.Names.SERVER, RtspController.SERVER);
 			response.headers().add(RtspHeaders.Names.CSEQ, this.request.headers().get(RtspHeaders.Names.CSEQ));
@@ -137,29 +133,15 @@ public class DescribeAction implements Callable<FullHttpResponse> {
 
 		// TODO : Shoud endpoint.describe() return Description object which has all parameters like lastModified, sdp
 		// etc
-		String lastModified = formatter.format(new Date());
-		String date = formatter.format(new Date());
 
-		StringBuffer contentBase = new StringBuffer();
-		contentBase.append(reqParser.getEndpointName());
-		if (reqParser.getMediaFile() != null) {
-			contentBase.append("/");
-			contentBase.append(reqParser.getMediaFile());
-		}
-		contentBase.append("/");
 
 		response = new DefaultFullHttpResponse(RtspVersions.RTSP_1_0, RtspResponseStatuses.OK, Unpooled.copiedBuffer(sdp.getBytes("UTF-8")));
 		response.headers().add(HttpHeaders.Names.SERVER, RtspController.SERVER);
 		response.headers().add(RtspHeaders.Names.CSEQ, this.request.headers().get(RtspHeaders.Names.CSEQ));
 		response.headers().add(HttpHeaders.Names.CONTENT_TYPE, "application/sdp");
 		response.headers().add(HttpHeaders.Names.CONTENT_LENGTH, String.valueOf(sdp.length()));
-		response.headers().add(RtspHeaders.Names.CONTENT_BASE, contentBase.toString());
-		response.headers().add(HttpHeaders.Names.LAST_MODIFIED, lastModified);
 		// TODO CACHE_CONTROL must come from settings. Let user decide how they want CACHE_CONTROL
 		response.headers().add(HttpHeaders.Names.CACHE_CONTROL, HttpHeaders.Values.MUST_REVALIDATE);
-		response.headers().add(HttpHeaders.Names.DATE, date);
-		// TODO EXPIRES must come from settings. Also depends on CACHE_CONTRL
-		response.headers().add(HttpHeaders.Names.EXPIRES, date);
 
 		return response;
 	}
